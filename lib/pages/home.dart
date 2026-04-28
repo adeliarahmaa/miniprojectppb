@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/food_model.dart';
 import '../services/food_service.dart';
@@ -8,7 +9,7 @@ import '../services/storage_service.dart';
 import '../services/notification_service.dart';
 
 class HomePage extends StatefulWidget {
-  final String mode; // normal / diet
+  final String mode;
 
   const HomePage({super.key, required this.mode});
 
@@ -27,7 +28,7 @@ class _HomePageState extends State<HomePage> {
   int get dailyLimit => widget.mode == "diet" ? 1500 : 2000;
 
   // =========================
-  // PICK CAMERA
+  // CAMERA
   // =========================
   Future<void> pickCamera() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.camera);
@@ -40,146 +41,165 @@ class _HomePageState extends State<HomePage> {
   }
 
   // =========================
-  // ADD FOOD
+  // CREATE (ADD)
   // =========================
   void showAddDialog() {
-    final name = TextEditingController();
-    final cal = TextEditingController();
-    final mood = TextEditingController();
+    final nameController = TextEditingController();
+    final calController = TextEditingController();
+    final moodController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Tambah Food"),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: const Text("Tambah Food"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: "Nama"),
+                ),
+                TextField(
+                  controller: calController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: "Kalori"),
+                ),
+                TextField(
+                  controller: moodController,
+                  decoration: const InputDecoration(labelText: "Mood"),
+                ),
 
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                decoration: const InputDecoration(labelText: "Nama"),
-              ),
-              TextField(
-                controller: cal,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: "Kalori"),
-              ),
-              TextField(
-                controller: mood,
-                decoration: const InputDecoration(labelText: "Mood"),
-              ),
+                const SizedBox(height: 10),
 
-              const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () async {
+                    await pickCamera();
+                    setStateDialog(() {});
+                  },
+                  child: const Text("Ambil Foto"),
+                ),
 
-              ElevatedButton(
-                onPressed: () async {
-                  await pickCamera();
-                  setState(() {});
-                },
-                child: const Text("Ambil Foto"),
-              ),
-
-              if (imageFile != null) Image.file(imageFile!, height: 100),
-            ],
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () async {
-                String imageUrl = "";
-
-                if (imageFile != null) {
-                  imageUrl = await storage.uploadImage(imageFile!);
-                }
-
-                int calValue = int.tryParse(cal.text) ?? 0;
-                totalCalories += calValue;
-
-                await service.addFood(
-                  FoodModel(
-                    name: name.text,
-                    calories: calValue,
-                    mood: mood.text,
-                    imageUrl: imageUrl,
-                  ),
-                );
-
-                // NOTIF
-                if (totalCalories >= dailyLimit) {
-                  await NotificationService.showNotification(
-                    id: 1,
-                    title: "⚠️ Over Limit",
-                    body: "Total $totalCalories kcal (limit $dailyLimit)",
-                  );
-                } else {
-                  await NotificationService.showNotification(
-                    id: 2,
-                    title: "🍱 Food Added",
-                    body: "Total $totalCalories kcal",
-                  );
-                }
-
-                if (!mounted) return;
-                Navigator.pop(context);
-
-                setState(() {
-                  imageFile = null;
-                });
-              },
-              child: const Text("Simpan"),
+                if (imageFile != null) Image.file(imageFile!, height: 100),
+              ],
             ),
-          ],
-        );
-      },
+            actions: [
+              TextButton(
+                onPressed: () async {
+                  String imageUrl = "";
+
+                  if (imageFile != null) {
+                    imageUrl = await storage.uploadImage(imageFile!);
+                  }
+
+                  int cal = int.tryParse(calController.text) ?? 0;
+                  totalCalories += cal;
+
+                  await service.addFood(
+                    FoodModel(
+                      name: nameController.text,
+                      calories: cal,
+                      mood: moodController.text,
+                      imageUrl: imageUrl,
+                    ),
+                  );
+
+                  // NOTIF
+                  if (totalCalories > dailyLimit) {
+                    await NotificationService.showNotification(
+                      id: 1,
+                      title: "Over Limit",
+                      body: "Kalori: $totalCalories / $dailyLimit",
+                    );
+                  } else if (totalCalories < dailyLimit) {
+                    await NotificationService.showNotification(
+                      id: 2,
+                      title: "Belum Target",
+                      body: "Masih $totalCalories dari $dailyLimit",
+                    );
+                  } else {
+                    await NotificationService.showNotification(
+                      id: 3,
+                      title: "Target Pas",
+                      body: "Kamu tepat $dailyLimit kcal",
+                    );
+                  }
+
+                  if (!mounted) return;
+                  Navigator.pop(context);
+
+                  setState(() {
+                    imageFile = null;
+                  });
+                },
+                child: const Text("Simpan"),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
   // =========================
-  // EDIT FOOD
+  // UPDATE (EDIT)
   // =========================
   void showEditDialog(FoodModel food) {
-    final name = TextEditingController(text: food.name);
-    final cal = TextEditingController(text: food.calories.toString());
-    final mood = TextEditingController(text: food.mood);
+    final nameController = TextEditingController(text: food.name);
+    final calController = TextEditingController(text: food.calories.toString());
+    final moodController = TextEditingController(text: food.mood);
 
     showDialog(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Edit Food"),
-
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(controller: name),
-              TextField(controller: cal, keyboardType: TextInputType.number),
-              TextField(controller: mood),
-            ],
-          ),
-
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await service.updateFood(
-                  food.id!,
-                  FoodModel(
-                    name: name.text,
-                    calories: int.tryParse(cal.text) ?? 0,
-                    mood: mood.text,
-                    imageUrl: food.imageUrl,
-                  ),
-                );
-
-                if (!mounted) return;
-                Navigator.pop(context);
-              },
-              child: const Text("Update"),
+      builder: (context) => AlertDialog(
+        title: const Text("Edit Food"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: "Nama"),
+            ),
+            TextField(
+              controller: calController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: "Kalori"),
+            ),
+            TextField(
+              controller: moodController,
+              decoration: const InputDecoration(labelText: "Mood"),
             ),
           ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await service.updateFood(
+                food.id!,
+                FoodModel(
+                  name: nameController.text,
+                  calories: int.tryParse(calController.text) ?? 0,
+                  mood: moodController.text,
+                  imageUrl: food.imageUrl,
+                ),
+              );
+
+              if (!mounted) return;
+              Navigator.pop(context);
+            },
+            child: const Text("Update"),
+          ),
+        ],
+      ),
     );
+  }
+
+  // =========================
+  // LOGOUT
+  // =========================
+  Future<void> logout() async {
+    await FirebaseAuth.instance.signOut();
   }
 
   // =========================
@@ -188,14 +208,25 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("MoodBite (${widget.mode})")),
+      appBar: AppBar(
+        title: Text("MoodBite (${widget.mode})"),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        actions: [
+          IconButton(icon: const Icon(Icons.logout), onPressed: logout),
+        ],
+      ),
 
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(10),
             child: Text(
-              "Target: $dailyLimit kcal | Total: $totalCalories",
+              "Mode: ${widget.mode.toUpperCase()} | Target: $dailyLimit | Total: $totalCalories",
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
@@ -218,11 +249,7 @@ class _HomePageState extends State<HomePage> {
                     return Card(
                       child: ListTile(
                         leading: food.imageUrl.isNotEmpty
-                            ? Image.network(
-                                food.imageUrl,
-                                width: 50,
-                                height: 50,
-                              )
+                            ? Image.network(food.imageUrl, width: 50)
                             : const Icon(Icons.fastfood),
 
                         title: Text(food.name),
@@ -236,7 +263,7 @@ class _HomePageState extends State<HomePage> {
                               onPressed: () => showEditDialog(food),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              icon: const Icon(Icons.delete),
                               onPressed: () {
                                 service.deleteFood(food.id!);
                               },
