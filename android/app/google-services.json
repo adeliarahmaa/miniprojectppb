@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "270748566886",
+    "project_id": "miniprojectppb",
+    "storage_bucket": "miniprojectppb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:270748566886:android:91e30de8b297f1ff9d34a7",
+        "android_client_info": {
+          "package_name": "com.example.moodbite"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyADSbjld_T0mW71U8bX2TXmvc5m0qEWkq0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
