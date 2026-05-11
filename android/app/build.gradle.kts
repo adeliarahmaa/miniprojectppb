@@ -17,12 +17,12 @@ android {
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
         applicationId = "com.example.moodbite"
-        minSdk = flutter.minSdkVersion
+        minSdk = 26
         targetSdk = 33
         versionCode = flutter.versionCode
         versionName = flutter.versionName
@@ -37,6 +37,10 @@ android {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+}
+configurations.configureEach {
+    exclude(group = "org.tensorflow")
+    exclude(group = "org.tensorflow.lite")
 }
 
 flutter {
